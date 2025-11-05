@@ -119,7 +119,7 @@ class ServiceRequestController extends BaseController
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", format="uuid")
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -197,7 +197,7 @@ class ServiceRequestController extends BaseController
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", format="uuid")
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
@@ -269,7 +269,7 @@ class ServiceRequestController extends BaseController
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", format="uuid")
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -310,7 +310,7 @@ class ServiceRequestController extends BaseController
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", format="uuid")
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
