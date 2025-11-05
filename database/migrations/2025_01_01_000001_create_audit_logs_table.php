@@ -12,11 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('audit_logs', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->uuid('user_id')->nullable();
+            $table->bigIncrements('id');
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->string('event');
             $table->string('auditable_type');
-            $table->uuid('auditable_id')->nullable();
+            $table->unsignedBigInteger('auditable_id')->nullable();
             $table->json('old_values')->nullable();
             $table->json('new_values')->nullable();
             $table->string('ip_address', 45)->nullable();
