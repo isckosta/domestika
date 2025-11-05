@@ -16,6 +16,25 @@ class UpdateProfessionalRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     * Decode JSON strings for form-data requests.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Decode schedule if it's a JSON string (from form-data)
+        if ($this->has('schedule') && is_string($this->schedule)) {
+            try {
+                $decoded = json_decode($this->schedule, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $this->merge(['schedule' => $decoded]);
+                }
+            } catch (\Exception $e) {
+                // If decoding fails, leave as is and let validation handle it
+            }
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
