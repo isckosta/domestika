@@ -1,0 +1,1771 @@
+{
+	"info": {
+		"_postman_id": "domestika-api-collection",
+		"name": "Domestika Laravel API",
+		"description": "Complete API collection for Domestika Laravel 12 project\n\n**Base URL**: http://localhost:8000/api/v1\n\n**Authentication**: JWT Bearer Token\n\n**Features**:\n- User registration and authentication with email verification\n- JWT token management with refresh token rotation\n- Password recovery (forgot/reset)\n- Professional profile management (upgrade contractor to professional)\n- Role-Based Access Control (RBAC)\n- Credit System (D$) - Internal symbolic economy\n- Direct Request Module - Intelligent matching system (semantic-based, no geolocation)\n- Health monitoring and metrics\n- User, Role, and Permission management\n\n**Security Features**:\n- Email verification required before login\n- Refresh token rotation (old token invalidated)\n- Rate limiting (3-5 requests per minute on auth endpoints)\n- IP-based blocking after 5 failed attempts\n- Login attempt tracking\n- JWT custom claims with roles and permissions\n\n**Professional Profiles**:\n- All users start as 'contractor' role\n- Upgrade to 'professional' by creating professional profile\n- Users can have both roles simultaneously\n- Profile includes bio, skills, photo, schedule, reputation\n- Automatic embedding generation for semantic matching\n\n**Credit System**:\n- View balance and transaction history\n- Add credits (Admin only)\n- Deduct credits for unlocking features\n- Transfer credits between users\n- Automatic rewards via reputation events\n- Audit trail with SHA256 hash\n\n**Direct Request Module**:\n- Contractors create service requests with structured form\n- Automatic semantic vector generation (PGVector)\n- Hybrid recommendation engine (semantic embeddings 50%, reputation 30%, availability 10%, skills 10%)\n- Professionals receive matched requests\n- Response system and chat integration\n- Full audit trail with Activity Log\n- No geolocation dependency\n\n**Setup**:\n1. Import the environment file\n2. Run 'Register User' - email verification link will be sent\n3. Verify email using the link (or use 'Resend Email Verification')\n4. Run 'Login' to get a token\n5. Token will be automatically saved and used in protected routes\n6. For professionals: Create professional profile via 'Create Professional Profile'\n7. Admin users can add credits to any user\n8. Regular users can check balance, deduct, and transfer credits\n9. Contractors can create service requests\n10. Professionals can view compatible requests and respond",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data.access_token) {",
+									"        pm.environment.set('access_token', jsonData.data.access_token);",
+									"    }",
+									"    if (jsonData.data.user && jsonData.data.user.id) {",
+									"        pm.environment.set('user_id', jsonData.data.user.id);",
+									"        pm.environment.set('user_uuid', jsonData.data.user.id);",
+									"        ",
+									"        // Calculate SHA1 hash of email for verification",
+									"        if (jsonData.data.user.email) {",
+									"            const email = jsonData.data.user.email;",
+									"            try {",
+									"                // CryptoJS is available in Postman",
+									"                const hash = CryptoJS.SHA1(email).toString();",
+									"                pm.environment.set('email_verification_hash', hash);",
+									"                console.log('✓ Email verification hash calculated:', hash);",
+									"                console.log('✓ Verification URL: {{base_url}}/auth/email/verify/' + jsonData.data.user.id + '/' + hash);",
+									"            } catch (e) {",
+									"                console.warn('Could not calculate hash automatically. Please use SHA1(email) manually.');",
+									"                console.log('Email:', email);",
+									"            }",
+									"        }",
+									"    }",
+									"    console.log('User registered successfully. Email verification required.');",
+									"    if (jsonData.data.email_verification_required) {",
+									"        console.log('Check your email for verification link!');",
+									"        console.log('Or use the Verify Email endpoint with the calculated hash.');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"Password123!\",\n    \"password_confirmation\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new user and receive JWT tokens.\n\n**Request Body**:\n- `name` (string, required): User's full name\n- `email` (string, required): Valid email address\n- `password` (string, required): Min 8 characters, must include uppercase, lowercase, and number\n- `password_confirmation` (string, required): Must match password\n\n**Response**: User object with access_token and email_verification_required flag\n\n**Note**: User receives email verification link. Email must be verified before login. Default role 'contractor' is assigned automatically.\n\n**Automated Actions**:\n- After successful registration, the test script automatically:\n  - Saves `access_token` to environment\n  - Saves `user_id` to environment\n  - Calculates SHA1 hash of email and saves as `email_verification_hash`\n  - Logs the verification URL in console\n\n**Security**: Rate limited to 3 requests per minute"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data.access_token) {",
+									"        pm.environment.set('access_token', jsonData.data.access_token);",
+									"        console.log('Access token saved successfully');",
+									"    }",
+									"} else if (pm.response.code === 403) {",
+									"    console.log('Email not verified. Please verify your email first.');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticate user and receive JWT tokens.\n\n**Request Body**:\n- `email` (string, required): User's email\n- `password` (string, required): User's password\n\n**Response**: User object with access_token\n\n**Security Features**:\n- Email must be verified before login (403 if not verified)\n- Rate limiting: 5 attempts per minute\n- IP blocking after 5 failed attempts\n- Login attempts are tracked (success/failure)\n\n**Errors**:\n- 401: Invalid credentials\n- 403: Email not verified\n- 429: Too many failed attempts"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get authenticated user's information.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- User object with roles and permissions\n- `has_professional_profile`: Boolean indicating if user has professional profile\n- `professional_profile`: Professional profile object or null\n\n**Note**: Response includes professional profile information if available"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data.access_token) {",
+									"        pm.environment.set('access_token', jsonData.data.access_token);",
+									"        console.log('Token refreshed successfully. Old token invalidated.');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Refresh the access token using the current token.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**: New access_token\n\n**Security**: Refresh token rotation - old token is automatically invalidated when new token is issued"
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    pm.environment.unset('access_token');",
+									"    pm.environment.unset('refresh_token');",
+									"    console.log('Tokens cleared successfully');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Logout and invalidate the current token.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**: Success message"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/email/verify/:user_id/:hash",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"email",
+								"verify",
+								":user_id",
+								":hash"
+							],
+							"variable": [
+								{
+									"key": "user_id",
+									"value": "{{user_id}}",
+									"description": "User ID (integer)"
+								},
+								{
+									"key": "hash",
+									"value": "{{email_verification_hash}}",
+									"description": "SHA1 hash of email"
+								}
+							]
+						},
+						"description": "Verify user's email address using the link sent via email.\n\n**Path Parameters**:\n- `user_id` (int, required): User's ID\n- `hash` (string, required): SHA1 hash of the user's email address\n\n**Authentication**: Not required\n\n**Response**: Success message\n\n**How it works**:\n- The hash is SHA1(email) - a 40-character hexadecimal string\n- Example: SHA1('user@example.com') = 'a1b2c3d4...'\n- The hash is automatically calculated in the Register endpoint test script\n- Variable `{{email_verification_hash}}` is set automatically after registration\n- After verification, user can login normally\n\n**Note**: This link is typically accessed via email, but you can also use this endpoint manually with the hash calculated from the Register response."
+					},
+					"response": []
+				},
+				{
+					"name": "Resend Email Verification",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/email/resend",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"email",
+								"resend"
+							]
+						},
+						"description": "Resend email verification notification to the authenticated user.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**: Success message\n\n**Note**: Can only be used if email is not already verified (403 if already verified)"
+					},
+					"response": []
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"john.doe@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/password/forgot",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"password",
+								"forgot"
+							]
+						},
+						"description": "Request password reset link via email.\n\n**Authentication**: Not required\n\n**Request Body**:\n- `email` (string, required): User's email address\n\n**Response**: Success message (password reset link sent to email)\n\n**Security**: Rate limited to 3 requests per minute\n\n**Note**: Password reset link expires after 60 minutes"
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"token\": \"{{password_reset_token}}\",\n    \"password\": \"NewPassword123!\",\n    \"password_confirmation\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/password/reset",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"password",
+								"reset"
+							]
+						},
+						"description": "Reset user password using token from email.\n\n**Authentication**: Not required\n\n**Request Body**:\n- `email` (string, required): User's email address\n- `token` (string, required): Reset token from email\n- `password` (string, required): New password (min 8 characters)\n- `password_confirmation` (string, required): Must match password\n\n**Response**: Success message\n\n**Security**: Rate limited to 3 requests per minute\n\n**Errors**:\n- 422: Invalid or expired token"
+					},
+					"response": []
+				}
+			],
+			"description": "Authentication endpoints for user registration, login, logout, token management, email verification, and password recovery.\n\n**Security Features**:\n- Email verification required before login\n- Refresh token rotation\n- Rate limiting on sensitive endpoints\n- IP-based blocking for brute force protection\n- Login attempt tracking"
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Users",
+					"item": [
+						{
+							"name": "Create User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 201) {",
+											"    const jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        pm.environment.set('created_user_id', jsonData.data.id);",
+											"        console.log('✓ User created successfully. ID:', jsonData.data.id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"New User\",\n    \"email\": \"newuser@example.com\",\n    \"password\": \"Password123!\",\n    \"password_confirmation\": \"Password123!\",\n    \"roles\": [\"contractor\"],\n    \"email_verified\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/users",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users"
+									]
+								},
+								"description": "Create a new user manually (Admin only).\n\n**Authentication**: Required (Bearer Token)\n**Permission**: `users.create` (Admin only)\n\n**Request Body**:\n- `name` (string, required): User's full name\n- `email` (string, required): Valid email address (must be unique)\n- `password` (string, required): Min 8 characters\n- `password_confirmation` (string, required): Must match password\n- `roles` (array, optional): Array of role names (default: [\"contractor\"])\n- `email_verified` (boolean, optional): Mark email as verified (default: false)\n\n**Response**: User object with roles (201 Created)\n\n**Available Roles**:\n- `admin` - Full system access\n- `moderator` - Content moderation\n- `contractor` - Regular user (default)\n- `professional` - Service provider\n- `company` - Company account\n\n**Note**:\n- If `email_verified` is false, verification email will be sent automatically\n- All actions are logged for audit purposes\n- User creation is tracked in activity logs"
+							},
+							"response": []
+						},
+						{
+							"name": "List Users",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/users?page=1&per_page=15&search=&sort_by=created_at&sort_order=desc",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Page number for pagination"
+										},
+										{
+											"key": "per_page",
+											"value": "15",
+											"description": "Items per page (max 100)"
+										},
+										{
+											"key": "search",
+											"value": "",
+											"description": "Search by name or email"
+										},
+										{
+											"key": "sort_by",
+											"value": "created_at",
+											"description": "Field to sort by"
+										},
+										{
+											"key": "sort_order",
+											"value": "desc",
+											"description": "Sort order (asc/desc)"
+										}
+									]
+								},
+								"description": "Get paginated list of users.\n\n**Authentication**: Required (Bearer Token)\n**Permission**: `users.view`\n\n**Query Parameters**:\n- `page` (int, optional): Page number\n- `per_page` (int, optional): Items per page (max 100)\n- `search` (string, optional): Search term\n- `sort_by` (string, optional): Sort field\n- `sort_order` (string, optional): asc or desc\n\n**Response**: Paginated list of users with roles"
+							},
+							"response": []
+						},
+						{
+							"name": "Show User",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/users/:user_id",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users",
+										":user_id"
+									],
+									"variable": [
+										{
+											"key": "user_id",
+											"value": "{{user_uuid}}",
+											"description": "User UUID"
+										}
+									]
+								},
+								"description": "Get detailed information about a specific user.\n\n**Authentication**: Required (Bearer Token)\n**Permission**: `users.view`\n\n**Path Parameters**:\n- `user_id` (integer, required): User's ID\n\n**Response**: User object with roles and permissions"
+							},
+							"response": []
+						},
+						{
+							"name": "Update User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    const jsonData = pm.response.json();",
+											"    if (jsonData.data && jsonData.data.id) {",
+											"        console.log('✓ User updated successfully');",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"Updated Name\",\n    \"email\": \"updated@example.com\",\n    \"password\": \"NewPassword123!\",\n    \"password_confirmation\": \"NewPassword123!\",\n    \"roles\": [\"professional\", \"contractor\"],\n    \"email_verified\": true\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/admin/users/:user_id",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users",
+										":user_id"
+									],
+									"variable": [
+										{
+											"key": "user_id",
+											"value": "{{user_uuid}}",
+											"description": "User ID"
+										}
+									]
+								},
+								"description": "Update an existing user (Admin only).\n\n**Authentication**: Required (Bearer Token)\n**Permission**: `users.update`\n\n**Path Parameters**:\n- `user_id` (integer, required): User's ID\n\n**Request Body** (all fields optional):\n- `name` (string, optional): User's full name\n- `email` (string, optional): Valid email address (must be unique if changed)\n- `password` (string, optional): New password (min 8 characters)\n- `password_confirmation` (string, optional): Must match password if password is provided\n- `roles` (array, optional): Array of role names to replace existing roles\n- `email_verified` (boolean, optional): Mark email as verified/unverified\n\n**Response**: Updated user object with roles (200 OK)\n\n**Note**:\n- If email is changed, email_verified_at will be reset to null\n- All roles will be replaced if `roles` array is provided (use `syncRoles`)\n- If `email_verified` is set to false, verification email will be sent\n- All updates are logged for audit purposes\n- Users can update their own profile if they have `users.update` permission"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete User",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/users/:user_id",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"users",
+										":user_id"
+									],
+									"variable": [
+										{
+											"key": "user_id",
+											"value": "{{user_uuid}}",
+											"description": "User UUID"
+										}
+									]
+								},
+								"description": "Soft delete a user (moves to deleted_at timestamp).\n\n**Authentication**: Required (Bearer Token)\n**Permission**: `users.delete` (Admin only)\n\n**Path Parameters**:\n- `user_id` (integer, required): User's ID\n\n**Response**: Success message\n\n**Note**:\n- Users cannot delete themselves\n- Soft delete (trashed) - can be restored\n- All deletions are logged for audit purposes"
+							},
+							"response": []
+						}
+					],
+					"description": "User management endpoints for administrators."
+				},
+				{
+					"name": "Roles",
+					"item": [
+						{
+							"name": "List Roles",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/roles?page=1&per_page=15",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"roles"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Page number"
+										},
+										{
+											"key": "per_page",
+											"value": "15",
+											"description": "Items per page"
+										}
+									]
+								},
+								"description": "Get paginated list of roles.\n\n**Authentication**: Required (Bearer Token)\n\n**Query Parameters**:\n- `page` (int, optional): Page number\n- `per_page` (int, optional): Items per page\n\n**Response**: Paginated list of roles with permissions"
+							},
+							"response": []
+						},
+						{
+							"name": "Show Role",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/roles/:role_id",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"roles",
+										":role_id"
+									],
+									"variable": [
+										{
+											"key": "role_id",
+											"value": "1",
+											"description": "Role ID"
+										}
+									]
+								},
+								"description": "Get detailed information about a specific role.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `role_id` (int, required): Role ID\n\n**Response**: Role object with associated permissions"
+							},
+							"response": []
+						}
+					],
+					"description": "Role management endpoints for RBAC."
+				},
+				{
+					"name": "Permissions",
+					"item": [
+						{
+							"name": "List Permissions",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{access_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}/admin/permissions?page=1&per_page=15",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"admin",
+										"permissions"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Page number"
+										},
+										{
+											"key": "per_page",
+											"value": "15",
+											"description": "Items per page"
+										}
+									]
+								},
+								"description": "Get paginated list of permissions.\n\n**Authentication**: Required (Bearer Token)\n\n**Query Parameters**:\n- `page` (int, optional): Page number\n- `per_page` (int, optional): Items per page\n\n**Response**: Paginated list of available permissions"
+							},
+							"response": []
+						}
+					],
+					"description": "Permission management endpoints for RBAC."
+				}
+			],
+			"description": "Administrative endpoints for user, role, and permission management."
+		},
+		{
+			"name": "Credits (D$)",
+			"item": [
+				{
+					"name": "Get Balance",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/credits/balance",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"credits",
+								"balance"
+							]
+						},
+						"description": "Get current user's credit balance (D$).\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- `balance` (int): Current credit balance\n- `user_id` (UUID): User's ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transaction History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/credits/transactions?limit=50",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"credits",
+								"transactions"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "50",
+									"description": "Number of transactions to retrieve (default: 50)"
+								}
+							]
+						},
+						"description": "Get current user's credit transaction history.\n\n**Authentication**: Required (Bearer Token)\n\n**Query Parameters**:\n- `limit` (int, optional): Number of transactions (default: 50)\n\n**Response**:\n- Array of transactions with details (id, amount, type, reason, hash, metadata, created_at)\n- Each transaction includes SHA256 hash for audit trail"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Credits (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": \"{{user_uuid}}\",\n    \"amount\": 100,\n    \"reason\": \"Welcome bonus\",\n    \"reference_id\": \"welcome_bonus_2025\",\n    \"metadata\": {\n        \"campaign\": \"new_user_promo\",\n        \"source\": \"admin_panel\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/credits/add",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"credits",
+								"add"
+							]
+						},
+						"description": "Add credits to a user account (Admin only).\n\n**Authentication**: Required (Bearer Token + Permission: credits.add)\n\n**Request Body**:\n- `user_id` (UUID, required): Target user's ID\n- `amount` (int, required): Credits to add (1-1000000)\n- `reason` (string, required): Reason for credit addition\n- `reference_id` (string, optional): Unique reference for idempotency\n- `metadata` (object, optional): Additional data for audit\n\n**Response**:\n- Transaction details\n- New balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::addCredits)"
+					},
+					"response": []
+				},
+				{
+					"name": "Deduct Credits",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 50,\n    \"reason\": \"Unlock contact information\",\n    \"reference_id\": \"contact_unlock_abc123\",\n    \"metadata\": {\n        \"contact_id\": \"9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d\",\n        \"professional_name\": \"John Professional\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/credits/deduct",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"credits",
+								"deduct"
+							]
+						},
+						"description": "Deduct credits from current user's account.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body**:\n- `amount` (int, required): Credits to deduct (must have sufficient balance)\n- `reason` (string, required): Reason for deduction\n- `reference_id` (string, optional): Unique reference for idempotency\n- `metadata` (object, optional): Additional context\n\n**Response**:\n- Transaction details (negative amount)\n- New balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::deductCredits)\n\n**Errors**:\n- 422: Validation error\n- 500: Insufficient balance or other error"
+					},
+					"response": []
+				},
+				{
+					"name": "Transfer Credits",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"to_user_id\": \"7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d\",\n    \"amount\": 75,\n    \"reason\": \"Payment for service\",\n    \"reference_id\": \"service_payment_xyz789\",\n    \"metadata\": {\n        \"service_id\": \"srv_123456\",\n        \"service_type\": \"contact_unlock\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/credits/transfer",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"credits",
+								"transfer"
+							]
+						},
+						"description": "Transfer credits to another user.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body**:\n- `to_user_id` (UUID, required): Recipient user's ID (cannot be yourself)\n- `amount` (int, required): Credits to transfer\n- `reason` (string, required): Reason for transfer\n- `reference_id` (string, optional): Unique reference\n- `metadata` (object, optional): Additional data\n\n**Response**:\n- `transaction_out`: Your deduction transaction\n- `transaction_in`: Recipient's credit transaction\n- `balance`: Your new balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::transferCredits)\n\n**Notes**:\n- Creates two transactions (one out, one in) with same reference_id\n- Atomic operation (both succeed or both fail)\n- Both transactions share the same reference_id"
+					},
+					"response": []
+				}
+			],
+			"description": "Credit system endpoints for managing Domestika Credits (D$). Users can view balance, transaction history, deduct credits, and transfer to other users. Admins can add credits to any user."
+		},
+		{
+			"name": "Service Requests",
+			"item": [
+				{
+					"name": "Create Service Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.environment.set('service_request_id', jsonData.data.id);",
+									"        console.log('Service request ID saved:', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"category\": \"cleaning\",\n    \"workload_size\": \"medium\",\n    \"frequency\": \"weekly\",\n    \"urgency\": \"medium\",\n    \"description\": \"Preciso de uma faxineira para limpeza semanal da minha casa. 3 quartos, 2 banheiros, sala e cozinha.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/service-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests"
+							]
+						},
+						"description": "Create a new service request as a contractor.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body**:\n- `category` (string, required): One of: cleaning, cooking, laundry, babysitting, gardening\n- `workload_size` (string, required): One of: small, medium, large\n- `frequency` (string, required): One of: once, weekly, biweekly, monthly\n- `urgency` (string, required): One of: low, medium, high\n- `description` (string, optional): Additional context\n\n**Response**:\n- Service request object with ID\n- Status will be 'pending' initially\n- Embedding generation and matching happens asynchronously\n\n**Process**:\n1. Embedding vector is generated asynchronously\n2. Matching engine finds compatible professionals using semantic similarity, reputation, availability, and skills\n3. Top 3-5 professionals are matched\n4. Professionals are notified"
+					},
+					"response": []
+				},
+				{
+					"name": "List My Service Requests",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/service-requests",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests"
+							]
+						},
+						"description": "Get all service requests created by the current user (contractor).\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- Array of service requests\n- Includes status, matched professionals, and all details"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Service Request",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/service-requests/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{service_request_id}}",
+									"description": "Service Request UUID"
+								}
+							]
+						},
+						"description": "Get a specific service request by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Service request object with full details\n- Includes matched professionals with scores"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Compatible Requests (Professional)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/service-requests/compatible",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests",
+								"compatible"
+							]
+						},
+						"description": "Get service requests compatible with the current professional.\n\n**Authentication**: Required (Bearer Token + Professional Profile)\n\n**Response**:\n- Array of matched service requests\n- Only shows requests where professional appears in matched_professionals\n- Includes matching scores and details\n\n**Note**: User must have a professional profile to use this endpoint"
+					},
+					"response": []
+				},
+				{
+					"name": "Respond to Request",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.response && jsonData.data.response.professional_id) {",
+									"        pm.environment.set('professional_id', jsonData.data.response.professional_id);",
+									"        console.log('Professional ID saved');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"interested\",\n    \"message\": \"Olá! Tenho experiência com limpeza residencial e estou disponível para o horário solicitado. Posso começar na próxima semana.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/service-requests/:id/respond",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests",
+								":id",
+								"respond"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{service_request_id}}",
+									"description": "Service Request UUID"
+								}
+							]
+						},
+						"description": "Respond to a service request as a professional.\n\n**Authentication**: Required (Bearer Token + Professional Profile)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Request Body**:\n- `status` (string, required): One of: interested, declined\n- `message` (string, optional): Optional message to contractor\n\n**Response**:\n- Response object with status and timestamp\n- Contractor is notified automatically\n\n**Note**:\n- Professional must be in the matched_professionals list\n- Only one response per professional per request"
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Service Request",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/service-requests/:id/cancel",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests",
+								":id",
+								"cancel"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{service_request_id}}",
+									"description": "Service Request UUID"
+								}
+							]
+						},
+						"description": "Cancel a service request (contractor only).\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Updated service request with status 'cancelled'\n- Activity is logged\n\n**Note**: Only the contractor who created the request can cancel it"
+					},
+					"response": []
+				},
+				{
+					"name": "Complete Service Request",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/service-requests/:id/complete",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"service-requests",
+								":id",
+								"complete"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{service_request_id}}",
+									"description": "Service Request UUID"
+								}
+							]
+						},
+						"description": "Mark a service request as completed.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Updated service request with status 'completed'\n- Professional is notified\n- Activity is logged\n\n**Note**:\n- Contractor or professional (who accepted) can mark as completed\n- After completion, both sides can review each other"
+					},
+					"response": []
+				}
+			],
+			"description": "Direct Request module endpoints for contractors and professionals. Contractors create service requests describing their needs. The system automatically matches compatible professionals using hybrid scoring (semantic similarity via PGVector embeddings, reputation, availability, and skills). Professionals receive notifications and can respond. All actions are logged with Activity Log for full audit trail."
+		},
+		{
+			"name": "Professionals",
+			"item": [
+				{
+					"name": "Create Professional Profile",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.data && jsonData.data.id) {",
+									"        pm.environment.set('professional_id', jsonData.data.id);",
+									"        console.log('Professional profile created:', jsonData.data.id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "bio",
+									"value": "Sou profissional de limpeza com 5 anos de experiência. Trabalho com produtos de qualidade e respeito ao cliente. Especializada em limpeza residencial e organização.",
+									"type": "text"
+								},
+								{
+									"key": "skills[]",
+									"value": "limpeza_residencial",
+									"type": "text"
+								},
+								{
+									"key": "skills[]",
+									"value": "organizacao",
+									"type": "text"
+								},
+								{
+									"key": "skills[]",
+									"value": "passar_roupa",
+									"type": "text"
+								},
+								{
+									"key": "schedule",
+									"value": "{\"monday\":{\"available\":true,\"hours\":[\"08:00-18:00\"]},\"tuesday\":{\"available\":true,\"hours\":[\"08:00-18:00\"]},\"wednesday\":{\"available\":true,\"hours\":[\"08:00-18:00\"]},\"thursday\":{\"available\":true,\"hours\":[\"08:00-18:00\"]},\"friday\":{\"available\":true,\"hours\":[\"08:00-18:00\"]}}",
+									"type": "text"
+								},
+								{
+									"key": "photo",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/professionals",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals"
+							]
+						},
+						"description": "Create a professional profile for the authenticated user.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body** (multipart/form-data):\n- `bio` (string, required): Professional bio (min 50, max 2000 characters)\n- `skills[]` (array, required): Array of skills (1-20 items)\n- `photo` (file, optional): Profile photo (max 2MB, jpeg/png/jpg)\n- `schedule` (object, optional): Availability schedule\n\n**Response**:\n- Professional profile object\n- Role 'professional' is automatically assigned\n- Embedding is generated asynchronously\n\n**Note**: User must have role 'contractor' (default). This endpoint upgrades the user to 'contractor + professional'."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Professional Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/professionals/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals",
+								"me"
+							]
+						},
+						"description": "Get the authenticated user's professional profile.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- Professional profile object with user information\n\n**Errors**:\n- 404: Professional profile not found"
+					},
+					"response": []
+				},
+				{
+					"name": "Update My Professional Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "bio",
+									"value": "Updated bio with more experience...",
+									"type": "text"
+								},
+								{
+									"key": "skills[]",
+									"value": "limpeza_residencial",
+									"type": "text"
+								},
+								{
+									"key": "skills[]",
+									"value": "limpeza_comercial",
+									"type": "text"
+								},
+								{
+									"key": "is_active",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "photo",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/professionals/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals",
+								"me"
+							]
+						},
+						"description": "Update the authenticated user's professional profile.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body** (multipart/form-data, all fields optional):\n- `bio` (string, optional): Updated bio\n- `skills[]` (array, optional): Updated skills\n- `photo` (file, optional): New profile photo (old photo is deleted)\n- `schedule` (object, optional): Updated schedule\n- `is_active` (boolean, optional): Active status\n\n**Response**:\n- Updated professional profile\n- Embedding is regenerated if bio or skills changed\n\n**Note**: Only own profile can be updated (unless admin)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete My Professional Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/professionals/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals",
+								"me"
+							]
+						},
+						"description": "Delete (deactivate) the authenticated user's professional profile.\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- Success message\n\n**Note**:\n- Soft delete (profile is not permanently removed)\n- Role 'professional' is removed from user\n- Role 'contractor' is maintained if exists\n- User can create a new profile later"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Professional Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/professionals/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{professional_id}}",
+									"description": "Professional Profile UUID"
+								}
+							]
+						},
+						"description": "Get a specific professional profile by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Professional profile ID\n\n**Response**:\n- Professional profile object with user information\n\n**Authorization**:\n- Own profile: Always allowed\n- Other profiles: Requires 'professionals.view' permission"
+					},
+					"response": []
+				},
+				{
+					"name": "List Professionals",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/professionals?page=1&per_page=15&category=&min_reputation=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"professionals"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "per_page",
+									"value": "15",
+									"description": "Items per page"
+								},
+								{
+									"key": "category",
+									"value": "",
+									"description": "Filter by category (if skills contain category)",
+									"disabled": true
+								},
+								{
+									"key": "min_reputation",
+									"value": "",
+									"description": "Minimum reputation score (0.0-1.0)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List all active professional profiles.\n\n**Authentication**: Required (Bearer Token)\n\n**Query Parameters**:\n- `page` (int, optional): Page number\n- `per_page` (int, optional): Items per page (default: 15)\n- `category` (string, optional): Filter by category (matches skills)\n- `min_reputation` (float, optional): Minimum reputation score\n\n**Response**:\n- Paginated list of professionals\n- Ordered by reputation score (descending)\n- Only shows active professionals"
+					},
+					"response": []
+				}
+			],
+			"description": "Professional profile management endpoints. Users can create, update, and manage their professional profiles to offer services on the platform. Creating a professional profile automatically assigns the 'professional' role (in addition to 'contractor'). The profile includes bio, skills, photo, schedule, and reputation information. Embedding vectors are generated asynchronously for semantic matching."
+		},
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check the health status of the application and its dependencies.\n\n**Authentication**: Not required\n\n**Response**:\n- Overall status\n- Database connection status\n- Redis connection status\n- Queue connection status\n- Timestamp"
+					},
+					"response": []
+				},
+				{
+					"name": "Metrics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "text/plain"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/metrics",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"metrics"
+							]
+						},
+						"description": "Get Prometheus-formatted metrics for monitoring.\n\n**Authentication**: Not required\n\n**Response**: Prometheus metrics in text format\n\n**Metrics Include**:\n- HTTP request counts\n- Response times\n- Error rates\n- Queue metrics\n- Database connection pool stats"
+					},
+					"response": []
+				}
+			],
+			"description": "System monitoring and health check endpoints."
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api/v1",
+			"type": "string"
+		}
+	]
+}

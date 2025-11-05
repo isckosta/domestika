@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan make:model:*)",
+      "Bash(php artisan:*)",
+      "Bash(docker compose exec:*)",
+      "Bash(make permissions:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,17 @@
+{
+    "_hash": "9f75155ace6cd9ed49b1f8e7bdb9852893681577fe6793463e770fd9f3b9ad04",
+    "patches": {
+        "vladimir-yuldashev/laravel-queue-rabbitmq": [
+            {
+                "package": "vladimir-yuldashev/laravel-queue-rabbitmq",
+                "description": "0",
+                "url": "patches/rabbitmq-laravel-12-compat.patch",
+                "sha256": "5d0f643b86582a1355db09ced0c215d76dce52b0d958d0a8c5760be5e58cecf9",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}
