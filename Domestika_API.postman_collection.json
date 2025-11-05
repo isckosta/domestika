@@ -569,7 +569,7 @@
 										{
 											"key": "user_id",
 											"value": "{{user_uuid}}",
-											"description": "User UUID"
+											"description": "User ID"
 										}
 									]
 								},
@@ -677,7 +677,7 @@
 										{
 											"key": "user_id",
 											"value": "{{user_uuid}}",
-											"description": "User UUID"
+											"description": "User ID"
 										}
 									]
 								},
@@ -870,7 +870,7 @@
 								"balance"
 							]
 						},
-						"description": "Get current user's credit balance (D$).\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- `balance` (int): Current credit balance\n- `user_id` (UUID): User's ID"
+						"description": "Get current user's credit balance (D$).\n\n**Authentication**: Required (Bearer Token)\n\n**Response**:\n- `balance` (int): Current credit balance\n- `user_id` (integer): User's ID"
 					},
 					"response": []
 				},
@@ -953,7 +953,7 @@
 								"add"
 							]
 						},
-						"description": "Add credits to a user account (Admin only).\n\n**Authentication**: Required (Bearer Token + Permission: credits.add)\n\n**Request Body**:\n- `user_id` (UUID, required): Target user's ID\n- `amount` (int, required): Credits to add (1-1000000)\n- `reason` (string, required): Reason for credit addition\n- `reference_id` (string, optional): Unique reference for idempotency\n- `metadata` (object, optional): Additional data for audit\n\n**Response**:\n- Transaction details\n- New balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::addCredits)"
+						"description": "Add credits to a user account (Admin only).\n\n**Authentication**: Required (Bearer Token + Permission: credits.add)\n\n**Request Body**:\n- `user_id` (integer, required): Target user's ID\n- `amount` (int, required): Credits to add (1-1000000)\n- `reason` (string, required): Reason for credit addition\n- `reference_id` (string, optional): Unique reference for idempotency\n- `metadata` (object, optional): Additional data for audit\n\n**Response**:\n- Transaction details\n- New balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::addCredits)"
 					},
 					"response": []
 				},
@@ -983,7 +983,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"amount\": 50,\n    \"reason\": \"Unlock contact information\",\n    \"reference_id\": \"contact_unlock_abc123\",\n    \"metadata\": {\n        \"contact_id\": \"9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d\",\n        \"professional_name\": \"John Professional\"\n    }\n}"
+							"raw": "{\n    \"amount\": 50,\n    \"reason\": \"Unlock contact information\",\n    \"reference_id\": \"contact_unlock_abc123\",\n    \"metadata\": {\n        \"contact_id\": 456,\n        \"professional_name\": \"John Professional\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/credits/deduct",
@@ -1025,7 +1025,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"to_user_id\": \"7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d\",\n    \"amount\": 75,\n    \"reason\": \"Payment for service\",\n    \"reference_id\": \"service_payment_xyz789\",\n    \"metadata\": {\n        \"service_id\": \"srv_123456\",\n        \"service_type\": \"contact_unlock\"\n    }\n}"
+							"raw": "{\n    \"to_user_id\": 123,\n    \"amount\": 75,\n    \"reason\": \"Payment for service\",\n    \"reference_id\": \"service_payment_xyz789\",\n    \"metadata\": {\n        \"service_id\": \"srv_123456\",\n        \"service_type\": \"contact_unlock\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/credits/transfer",
@@ -1037,7 +1037,7 @@
 								"transfer"
 							]
 						},
-						"description": "Transfer credits to another user.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body**:\n- `to_user_id` (UUID, required): Recipient user's ID (cannot be yourself)\n- `amount` (int, required): Credits to transfer\n- `reason` (string, required): Reason for transfer\n- `reference_id` (string, optional): Unique reference\n- `metadata` (object, optional): Additional data\n\n**Response**:\n- `transaction_out`: Your deduction transaction\n- `transaction_in`: Recipient's credit transaction\n- `balance`: Your new balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::transferCredits)\n\n**Notes**:\n- Creates two transactions (one out, one in) with same reference_id\n- Atomic operation (both succeed or both fail)\n- Both transactions share the same reference_id"
+						"description": "Transfer credits to another user.\n\n**Authentication**: Required (Bearer Token)\n\n**Request Body**:\n- `to_user_id` (integer, required): Recipient user's ID (cannot be yourself)\n- `amount` (int, required): Credits to transfer\n- `reason` (string, required): Reason for transfer\n- `reference_id` (string, optional): Unique reference\n- `metadata` (object, optional): Additional data\n\n**Response**:\n- `transaction_out`: Your deduction transaction\n- `transaction_in`: Recipient's credit transaction\n- `balance`: Your new balance\n\n**Authorization**: Uses Policy-based authorization (CreditPolicy::transferCredits)\n\n**Notes**:\n- Creates two transactions (one out, one in) with same reference_id\n- Atomic operation (both succeed or both fail)\n- Both transactions share the same reference_id"
 					},
 					"response": []
 				}
@@ -1171,11 +1171,11 @@
 								{
 									"key": "id",
 									"value": "{{service_request_id}}",
-									"description": "Service Request UUID"
+									"description": "Service Request ID"
 								}
 							]
 						},
-						"description": "Get a specific service request by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Service request object with full details\n- Includes matched professionals with scores"
+						"description": "Get a specific service request by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (integer, required): Service request ID\n\n**Response**:\n- Service request object with full details\n- Includes matched professionals with scores"
 					},
 					"response": []
 				},
@@ -1272,11 +1272,11 @@
 								{
 									"key": "id",
 									"value": "{{service_request_id}}",
-									"description": "Service Request UUID"
+									"description": "Service Request ID"
 								}
 							]
 						},
-						"description": "Respond to a service request as a professional.\n\n**Authentication**: Required (Bearer Token + Professional Profile)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Request Body**:\n- `status` (string, required): One of: interested, declined\n- `message` (string, optional): Optional message to contractor\n\n**Response**:\n- Response object with status and timestamp\n- Contractor is notified automatically\n\n**Note**:\n- Professional must be in the matched_professionals list\n- Only one response per professional per request"
+						"description": "Respond to a service request as a professional.\n\n**Authentication**: Required (Bearer Token + Professional Profile)\n\n**Path Parameters**:\n- `id` (integer, required): Service request ID\n\n**Request Body**:\n- `status` (string, required): One of: interested, declined\n- `message` (string, optional): Optional message to contractor\n\n**Response**:\n- Response object with status and timestamp\n- Contractor is notified automatically\n\n**Note**:\n- Professional must be in the matched_professionals list\n- Only one response per professional per request"
 					},
 					"response": []
 				},
@@ -1314,11 +1314,11 @@
 								{
 									"key": "id",
 									"value": "{{service_request_id}}",
-									"description": "Service Request UUID"
+									"description": "Service Request ID"
 								}
 							]
 						},
-						"description": "Cancel a service request (contractor only).\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Updated service request with status 'cancelled'\n- Activity is logged\n\n**Note**: Only the contractor who created the request can cancel it"
+						"description": "Cancel a service request (contractor only).\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (integer, required): Service request ID\n\n**Response**:\n- Updated service request with status 'cancelled'\n- Activity is logged\n\n**Note**: Only the contractor who created the request can cancel it"
 					},
 					"response": []
 				},
@@ -1356,11 +1356,11 @@
 								{
 									"key": "id",
 									"value": "{{service_request_id}}",
-									"description": "Service Request UUID"
+									"description": "Service Request ID"
 								}
 							]
 						},
-						"description": "Mark a service request as completed.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Service request ID\n\n**Response**:\n- Updated service request with status 'completed'\n- Professional is notified\n- Activity is logged\n\n**Note**:\n- Contractor or professional (who accepted) can mark as completed\n- After completion, both sides can review each other"
+						"description": "Mark a service request as completed.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (integer, required): Service request ID\n\n**Response**:\n- Updated service request with status 'completed'\n- Professional is notified\n- Activity is logged\n\n**Note**:\n- Contractor or professional (who accepted) can mark as completed\n- After completion, both sides can review each other"
 					},
 					"response": []
 				}
@@ -1620,11 +1620,11 @@
 								{
 									"key": "id",
 									"value": "{{professional_id}}",
-									"description": "Professional Profile UUID"
+									"description": "Professional Profile ID"
 								}
 							]
 						},
-						"description": "Get a specific professional profile by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (UUID, required): Professional profile ID\n\n**Response**:\n- Professional profile object with user information\n\n**Authorization**:\n- Own profile: Always allowed\n- Other profiles: Requires 'professionals.view' permission"
+						"description": "Get a specific professional profile by ID.\n\n**Authentication**: Required (Bearer Token)\n\n**Path Parameters**:\n- `id` (integer, required): Professional profile ID\n\n**Response**:\n- Professional profile object with user information\n\n**Authorization**:\n- Own profile: Always allowed\n- Other profiles: Requires 'professionals.view' permission"
 					},
 					"response": []
 				},
