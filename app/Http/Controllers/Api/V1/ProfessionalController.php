@@ -173,7 +173,7 @@ class ProfessionalController extends BaseController
      *         name="id",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", format="uuid")
+     *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
      *         response=200,
