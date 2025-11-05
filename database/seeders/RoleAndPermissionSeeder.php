@@ -140,6 +140,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'service-requests.update',
                 'service-requests.cancel',
                 'service-requests.complete',
+                'professionals.create',
                 'credits.view',
                 'credits.deduct',
                 'credits.transfer',
